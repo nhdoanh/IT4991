@@ -5,7 +5,7 @@
 // ignore_for_file: public_member_api_docs
 
 import 'dart:async';
-import 'dart:developer';
+import 'dart:developer' as dev;
 import 'dart:io';
 import 'dart:math';
 
@@ -858,7 +858,7 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     VideoData? recordedVideoData =
         await FlutterVideoInfo().getVideoInfo(videoFile!.path);
 
-    final int recorededWidth = recordedVideoData?.width ?? 320;
+    final int recordedWidth = recordedVideoData?.width ?? 320;
     final int recordedHeight = recordedVideoData?.height ?? 240;
 
     VideoData? pickedVideoData =
@@ -867,12 +867,14 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     final int pickedWidth = pickedVideoData?.width ?? 320;
     final int pickedHeight = pickedVideoData?.height ?? 240;
 
-    Directory savedDirectory = await getApplicationDocumentsDirectory();
+    Directory? savedDirectory = await getApplicationDocumentsDirectory();
 
     final commandValue =
-        """-y -i ${videoFile!.path} -i ${pickedVideo!.path} -filter_complex "nullsrc=size=${recorededWidth + pickedWidth}*${max(recordedHeight, pickedHeight)}[base];[0:v]setpts=PTS-STARTPTS,scale=$recorededWidth*$recordedHeight[upperleft];[1:v]setpts=PTS-STARTPTS,scale=$pickedWidth*$pickedHeight[upperright];[base][upperleft]overlay=shortest=1:x=0:y=0[tmp1];[tmp1][upperright]overlay=shortest=1:x=$recorededWidth:y=0" -c:a copy -c:v h264_videotoolbox -strict experimental ${savedDirectory.path}/output.MOV""";
+        """-y -i ${videoFile!.path} -i ${pickedVideo!.path} -filter_complex "nullsrc=size=${recordedWidth + pickedWidth}*${max(recordedHeight, pickedHeight)}[base];[0:v]setpts=PTS-STARTPTS,scale=$recordedWidth*$recordedHeight[upperleft];[1:v]setpts=PTS-STARTPTS,scale=$pickedWidth*$pickedHeight[upperright];[base][upperleft]overlay=shortest=1:x=0:y=0[tmp1];[tmp1][upperright]overlay=shortest=1:x=$recordedWidth:y=0" -c:a copy -c:v mpeg4 -strict experimental ${savedDirectory?.path}/output.mp4""";
 
-    await FlutterFFmpeg().execute(commandValue);
+    int result = await FlutterFFmpeg().execute(commandValue);
+    dev.log('$result', name: 'RESULT');
+
     _startVideoPlayer();
   }
 
@@ -1038,11 +1040,13 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     if (videoFile == null) {
       return;
     }
-    Directory path = await getApplicationDocumentsDirectory();
-    bool? result = await GallerySaver.saveVideo(path.path + "/output.MOV");
+
+    Directory? path = await getApplicationDocumentsDirectory();
+
+    bool? result = await GallerySaver.saveVideo("${path.path}/output.mp4");
 
     final VideoPlayerController vController =
-        VideoPlayerController.file(File(path.path + "/output.mkv"));
+        VideoPlayerController.file(File("${path.path}/output.mp4"));
 
     videoPlayerListener = () {
       if (videoController != null && videoController!.value.size != null) {
