@@ -209,16 +209,16 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
               flex: 1,
               child: CameraPreview(
                 controller!,
-                // child: LayoutBuilder(builder:
-                //     (BuildContext context, BoxConstraints constraints) {
-                //   return GestureDetector(
-                //     behavior: HitTestBehavior.opaque,
-                //     onScaleStart: _handleScaleStart,
-                //     onScaleUpdate: _handleScaleUpdate,
-                //     onTapDown: (TapDownDetails details) =>
-                //         onViewFinderTap(details, constraints),
-                //   );
-                // }),
+                child: LayoutBuilder(builder:
+                    (BuildContext context, BoxConstraints constraints) {
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onScaleStart: _handleScaleStart,
+                    onScaleUpdate: _handleScaleUpdate,
+                    onTapDown: (TapDownDetails details) =>
+                        onViewFinderTap(details, constraints),
+                  );
+                }),
               ),
             ),
             Flexible(flex: 1, child: _videoPickedPreview()),
