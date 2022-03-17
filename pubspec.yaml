@@ -14,12 +14,13 @@ dependencies:
 
   cupertino_icons: ^1.0.2
   camera: ^0.9.4+16
-  video_player: ^2.0.0
+  video_player: ^2.3.0
   image_picker: ^0.8.4+11
   flutter_ffmpeg: ^0.4.2
   gallery_saver: ^2.3.2
   path_provider: ^2.0.9
   flutter_video_info: ^1.2.0
+  chewie: ^1.3.1
 
 dev_dependencies:
   flutter_test:

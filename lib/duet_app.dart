@@ -10,6 +10,8 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:camera/camera.dart';
+import 'package:duet/list_video_page.dart';
+import 'package:duet/loading_overlay.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_ffmpeg/flutter_ffmpeg.dart';
@@ -20,6 +22,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 
 class CameraExampleHome extends StatefulWidget {
+  const CameraExampleHome({Key? key}) : super(key: key);
+
   @override
   _CameraExampleHomeState createState() {
     return _CameraExampleHomeState();
@@ -108,6 +112,22 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
       parent: _focusModeControlRowAnimationController,
       curve: Curves.easeInCubic,
     );
+
+    getVideoController();
+  }
+
+  Future<void> getVideoController() async {
+    Directory savedDirectory = await getApplicationDocumentsDirectory();
+    List<FileSystemEntity> files = savedDirectory.listSync(followLinks: false);
+    files = files.whereType<File>().toList();
+    print(files);
+    if (files.isNotEmpty) {
+      videoController = VideoPlayerController.file(files.first as File);
+
+      videoController?.initialize();
+
+      setState(() {});
+    }
   }
 
   @override
@@ -285,33 +305,43 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     final VideoPlayerController? localVideoController = videoController;
 
     return Expanded(
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            if (localVideoController == null && imageFile == null)
-              Container()
-            else
-              SizedBox(
-                child: (localVideoController == null)
-                    ? Image.file(File(imageFile!.path))
-                    : Container(
-                        child: Center(
-                          child: AspectRatio(
-                              aspectRatio:
-                                  localVideoController.value.size != null
-                                      ? localVideoController.value.aspectRatio
-                                      : 1.0,
-                              child: VideoPlayer(localVideoController)),
+      child: InkWell(
+        onTap: () {
+          Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const ListVideoPage()));
+        },
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              if (localVideoController == null && imageFile == null)
+                Container(
+                    width: 64.0,
+                    height: 64.0,
+                    decoration:
+                        BoxDecoration(border: Border.all(color: Colors.red)))
+              else
+                SizedBox(
+                  child: (localVideoController == null)
+                      ? Image.file(File(imageFile!.path))
+                      : Container(
+                          child: Center(
+                            child: AspectRatio(
+                                aspectRatio:
+                                    localVideoController.value.size != null
+                                        ? localVideoController.value.aspectRatio
+                                        : 1.0,
+                                child: VideoPlayer(localVideoController)),
+                          ),
+                          decoration: BoxDecoration(
+                              border: Border.all(color: Colors.pink)),
                         ),
-                        decoration: BoxDecoration(
-                            border: Border.all(color: Colors.pink)),
-                      ),
-                width: 64.0,
-                height: 64.0,
-              ),
-          ],
+                  width: 64.0,
+                  height: 64.0,
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -842,6 +872,8 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
   }
 
   Future<void> onStopButtonPressed() async {
+    loadingOverlay(context);
+
     XFile? file = await stopVideoRecording();
     if (mounted) {
       setState(() {});
@@ -851,9 +883,6 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
 
     showInSnackBar('Video recorded to ${file.path}');
     videoFile = file;
-
-    print(videoFile?.path);
-    print(pickedVideo?.path);
 
     VideoData? recordedVideoData =
         await FlutterVideoInfo().getVideoInfo(videoFile!.path);
@@ -867,15 +896,19 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     final int pickedWidth = pickedVideoData?.width ?? 320;
     final int pickedHeight = pickedVideoData?.height ?? 240;
 
-    Directory? savedDirectory = await getApplicationDocumentsDirectory();
+    Directory directory = await getApplicationDocumentsDirectory();
+    int id = DateTime.now().millisecondsSinceEpoch;
+    String savedPath = "${directory.path}/${id}_result.mp4";
 
     final commandValue =
-        """-y -i ${videoFile!.path} -i ${pickedVideo!.path} -filter_complex "nullsrc=size=${recordedWidth + pickedWidth}*${max(recordedHeight, pickedHeight)}[base];[0:v]setpts=PTS-STARTPTS,scale=$recordedWidth*$recordedHeight[upperleft];[1:v]setpts=PTS-STARTPTS,scale=$pickedWidth*$pickedHeight[upperright];[base][upperleft]overlay=shortest=1:x=0:y=0[tmp1];[tmp1][upperright]overlay=shortest=1:x=$recordedWidth:y=0" -c:a copy -c:v mpeg4 -strict experimental ${savedDirectory?.path}/output.mp4""";
-
+        """-y -i ${videoFile!.path} -i ${pickedVideo!.path} -filter_complex "nullsrc=size=${recordedWidth + pickedWidth}*${max(recordedHeight, pickedHeight)}[base];[0:v]setpts=PTS-STARTPTS,scale=$recordedWidth*$recordedHeight[upperleft];[1:v]setpts=PTS-STARTPTS,scale=$pickedWidth*$pickedHeight[upperright];[base][upperleft]overlay=shortest=1:x=0:y=0[tmp1];[tmp1][upperright]overlay=shortest=1:x=$recordedWidth:y=0" -c:a copy -c:v mpeg4 -strict experimental $savedPath""";
     int result = await FlutterFFmpeg().execute(commandValue);
+
     dev.log('$result', name: 'RESULT');
 
-    _startVideoPlayer();
+    _startVideoPlayer(id);
+
+    Navigator.of(context).pop();
   }
 
   Future<void> onPausePreviewButtonPressed() async {
@@ -1036,17 +1069,17 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
     }
   }
 
-  Future<void> _startVideoPlayer() async {
+  Future<void> _startVideoPlayer(int id) async {
     if (videoFile == null) {
       return;
     }
 
     Directory? path = await getApplicationDocumentsDirectory();
 
-    bool? result = await GallerySaver.saveVideo("${path.path}/output.mp4");
-
+    bool? result = await GallerySaver.saveVideo("${path.path}/$id.mp4");
+    dev.log(result.toString(), name: "RESULT");
     final VideoPlayerController vController =
-        VideoPlayerController.file(File("${path.path}/output.mp4"));
+        VideoPlayerController.file(File("${path.path}/$id.mp4"));
 
     videoPlayerListener = () {
       if (videoController != null && videoController!.value.size != null) {
@@ -1058,8 +1091,9 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
       }
     };
     vController.addListener(videoPlayerListener!);
-    await vController.setLooping(true);
+    await vController.setLooping(false);
     await vController.initialize();
+
     await videoController?.dispose();
     if (mounted) {
       setState(() {
@@ -1067,7 +1101,6 @@ class _CameraExampleHomeState extends State<CameraExampleHome>
         videoController = vController;
       });
     }
-    await vController.play();
   }
 
   Future<XFile?> takePicture() async {
